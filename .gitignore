@@ -1,0 +1,9 @@
+# personal data — never commit
+tests/private/
+*.pdf
+*.png
+# build/preview outputs
+preview.html
+app.js
+node_modules/
+_site/
