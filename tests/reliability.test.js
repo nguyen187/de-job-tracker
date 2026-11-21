@@ -9,7 +9,7 @@ global.window = global; global.addEventListener = () => {}; global.scrollTo = ()
 global.location = { hash: "" }; global.localStorage = { getItem: () => null, setItem() {} };
 global.console.error = () => {};
 eval(js.replace(/\/\* =+ Boot =+ \*\/[\s\S]*$/, "") + `
-global.__t = { cvYearsDetail, detectYearsJD, marketFit, marketFitCard, thaw, bulkSetStatus, draftStoryFromAnswer, csvPreview, csvIsDup, bringLine, bulletSources, cvCmpBase, funnelStats, firstReplyDays, tagResponse, patternCard, snapRecords, restoreRecord, snapPanel, parseCSV, csvToJobs, importJobsCSV, csvDate, viewForKey, openShortcuts, SHORTCUTS, NAV_NAMES, lineDiff, cvDiff, cvDiffCard, normDoc, pipelineReport, isIdle, staleDays, qThemes, storiesForQuestion, storyHint, removeWithUndo, toastActionGet: () => toastAction, LEARN, learnKey, learnLink, loadSample, rawRecords, rawCard, msgTemplate, searchAll, storyMatches, prepBrief, setupSteps, setupCard, jobRounds, weekReport, reportText, backupReminder, compareRows, QB, pickQuestion, logPractice, qStats, weekStats, wkKey, mdLite, removeJob, undoDelete, purgeTrash, TRASH, findDuplicate, jdSimilarity, filteredJobs, jobsCSV, whenLabel, deadlineInfo, interviewInfo, stageDays, upcomingEvents, icsFor, jobEvents, buildTodos, vBrief, briefAI, BREVITY, relAdded, addedAt, sortJobs, state, vAnalysis, vReview, vGrade, vPlan, vDebrief, normalizeState, render, localMatch, applyRemote, SYNC, pending, VIEWS, loadSample, isStale, hsh };`);
+global.__t = { cvSkillEvidence, seniorSignals, cvYearsDetail, detectYearsJD, marketFit, marketFitCard, thaw, bulkSetStatus, draftStoryFromAnswer, csvPreview, csvIsDup, bringLine, bulletSources, cvCmpBase, funnelStats, firstReplyDays, tagResponse, patternCard, snapRecords, restoreRecord, snapPanel, parseCSV, csvToJobs, importJobsCSV, csvDate, viewForKey, openShortcuts, SHORTCUTS, NAV_NAMES, lineDiff, cvDiff, cvDiffCard, normDoc, pipelineReport, isIdle, staleDays, qThemes, storiesForQuestion, storyHint, removeWithUndo, toastActionGet: () => toastAction, LEARN, learnKey, learnLink, loadSample, rawRecords, rawCard, msgTemplate, searchAll, storyMatches, prepBrief, setupSteps, setupCard, jobRounds, weekReport, reportText, backupReminder, compareRows, QB, pickQuestion, logPractice, qStats, weekStats, wkKey, mdLite, removeJob, undoDelete, purgeTrash, TRASH, findDuplicate, jdSimilarity, filteredJobs, jobsCSV, whenLabel, deadlineInfo, interviewInfo, stageDays, upcomingEvents, icsFor, jobEvents, buildTodos, vBrief, briefAI, BREVITY, relAdded, addedAt, sortJobs, state, vAnalysis, vReview, vGrade, vPlan, vDebrief, normalizeState, render, localMatch, applyRemote, SYNC, pending, VIEWS, loadSample, isStale, hsh };`);
 const T = global.__t;
 let pass = 0, fail = 0; const fails = [];
 const check = (n, ok, d) => { if (ok) pass++; else { fail++; fails.push(n + (d ? " → " + d : "")); } };
@@ -488,5 +488,22 @@ check("part-time counted separately", yd.part > 1.5 && yd.part < 2, JSON.stringi
 check("total = full + 50% part, floored", yd.years === Math.floor(yd.full + yd.part * 0.5 + 0.05), JSON.stringify(yd));
 check("education dates excluded", T.cvYearsDetail("Education\nBSc Oct. 2016 – Aug. 2020").years === 0);
 check("numeric months still work", T.cvYearsDetail(`Experience\nDE 01/${NOWY - 3} - 12/${NOWY - 1}`).full >= 2.9);
+
+// 46. evidence-based assessment
+const evCV = "Experience\nData Engineer at X\nBuilt Kafka and Spark pipelines processing 2 billion records/hour. Reduced cost by 30%.\nSkills\nAWS, Terraform, Kafka, Spark";
+const evd = T.cvSkillEvidence(evCV);
+check("skill in experience = evidenced", evd.evidenced.has("kafka") && evd.evidenced.has("spark"));
+check("skill only in Skills list = listed only", evd.listedOnly.has("aws") && evd.listedOnly.has("terraform") && !evd.listedOnly.has("kafka"));
+const sg = Object.fromEntries(T.seniorSignals(evCV).map(x => [x.k, x.ok]));
+check("signals: scale + impact found, lead/team missing", sg.scale && sg.impact && !sg.lead && !sg.team, JSON.stringify(sg));
+check("team size 2 is not a team signal", !T.seniorSignals("Team size: 2 member").find(x => x.k === "team").ok && T.seniorSignals("Team size: 5").find(x => x.k === "team").ok);
+T.state.jobs = []; T.state.profile = { cvText: evCV, role: "Senior Data Engineer", years: 5, skills: ["kafka", "spark", "aws", "terraform", "sql", "python"] };
+const mf3 = T.marketFit();
+check("senior target shows signals and caps verdict without enough evidence", mf3.sig && mf3.verdict !== "Sẵn sàng ứng tuyển");
+check("listed-only skills flagged", mf3.strong.some(x => x.k === "aws" && x.listed));
+T.state.profile = { cvText: evCV, role: "Mid Data Engineer", years: 3, skills: ["kafka"] };
+check("'trained model' is not a leadership signal", !T.seniorSignals("Predict using trained model").find(x => x.k === "lead").ok && T.seniorSignals("Mentored 2 junior engineers").find(x => x.k === "lead").ok);
+check("mid target: no seniority signals", T.marketFit().sig === null);
+T.state.profile = null;
 
 console.log(`\n${pass} passed, ${fail} failed`); fails.forEach(f => console.log("  ✕ " + f)); process.exitCode = fail ? 1 : 0;

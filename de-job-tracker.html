@@ -985,6 +985,26 @@ function buildTodos() {
 }
 
 /* ================= View: CV ================= */
+/* Evidence: a skill only in the Skills/Certificates list (never in experience or projects) is "listed only" — recruiters discount it. */
+function cvSkillEvidence(text) {
+  let sec = "body"; const listed = [], body = [];
+  for (const raw of String(text || "").split("\n")) { const l = raw.trim(); if (!l) continue;
+    if (l.length < 45 && /^(•\s*)?((programming |technical )?skills|kỹ năng|technical|certificat|chứng chỉ|languages?|ngoại ngữ|references?|tham chiếu)\b/i.test(l)) { sec = "list"; continue; }
+    if (l.length < 45 && /^(experience|kinh nghiệm|work|projects?|dự án|education|học vấn|summary|giới thiệu)\b/i.test(l)) { sec = "body"; continue; }
+    (sec === "list" ? listed : body).push(l); }
+  const ev = new Set(detectSkills(body.join("\n"))); const all = new Set([...ev, ...detectSkills(listed.join("\n"))]);
+  return { evidenced: ev, listedOnly: new Set([...all].filter(k => !ev.has(k))) };
+}
+/* Seniority signals beyond skills and years (deterministic, from CV text). Each: ok + short Vietnamese label. */
+const SENIOR_SIG = [
+  ["scale", "Quy mô dữ liệu cụ thể", /\b\d[\d.,–-]*\s*(?:tb|pb|gb|billion|million|tỷ|triệu|k)\b[^.\n]{0,25}(?:records?|messages?|events?|rows?|bản ghi|\/\s*(?:s|sec|second|hour|day|giờ|ngày)|per)|\d+\s*(?:tb|pb)\b/i],
+  ["impact", "Tác động đo được (%, chi phí, độ trễ, SLA)", /(?:reduc|cut|sav|improv|increas|decreas|giảm|tăng|tiết kiệm|rút ngắn)[^.\n]{0,60}\d+\s*%|\d+\s*%[^.\n]{0,40}(?:faster|cost|latency|nhanh|chi phí|độ trễ)|\$\s?\d|sla\b/i],
+  ["design", "Tự thiết kế kiến trúc / quyết định kỹ thuật", /\b(architect(?:ed|ure)?|designed|thiết kế (?:kiến trúc|hệ thống)|trade-?off|chose|lựa chọn công nghệ)\b/i],
+  ["lead", "Dẫn dắt / mentor người khác", /\b(led|lead(?:ing)? (?:a |the )?team|mentor(?:ed|ing)?|coach(?:ed)?|trained (?:\d+|new|junior|team)|onboarded (?:\d+|new)|dẫn dắt|hướng dẫn|trưởng nhóm|tech lead)\b/i],
+  ["team", "Làm trong team > 2 người hoặc liên team", /team size\s*:?\s*(?:[3-9]|\d{2,})|cross[- ]?(?:team|functional)|liên phòng ban|nhiều team/i],
+  ["stake", "Làm việc trực tiếp với stakeholder/business", /stakeholder|business (?:team|user|requirement)|product (?:team|owner)|khách hàng|requirement gathering/i],
+];
+function seniorSignals(text) { const t = String(text || ""); return SENIOR_SIG.map(([k, n, re]) => ({ k, n, ok: re.test(t) })); }
 /* CV vs market for the target level: years vs what JDs ask, demand-weighted skill coverage, share of tracked JDs that fit. No AI. */
 const LEVEL_YEARS = { Junior: 0, Mid: 2, Senior: 4, Lead: 6, Staff: 8 };
 function marketFit() {
@@ -998,25 +1018,31 @@ function marketFit() {
   pool.forEach(j => new Set(jdSkills(j)).forEach(k => freq[k] = (freq[k] || 0) + 1));
   const top = SK.map(sk => ({ k: sk.k, n: sk.n, cat: sk.cat, w: useJD ? Math.round((freq[sk.k] || 0) / pool.length * 100) : (MKT[sk.k] || 0) })).filter(x => x.w >= 10).sort((a, b) => b.w - a.w).slice(0, 12);
   const have = new Set(p.skills || []); const haveCats = new Set([...have].map(k => SKM[k]?.cat).filter(Boolean));
-  const tot = top.reduce((a, x) => a + x.w, 0); const cov = tot ? top.filter(x => have.has(x.k)).reduce((a, x) => a + x.w, 0) / tot : 0;
-  const yScore = req ? Math.min(1, yrs / req) : 1; const score = Math.round((cov * 0.65 + yScore * 0.35) * 100);
+  const evd = p.cvText ? cvSkillEvidence(p.cvText) : null; const listedOnly = k => !!evd && evd.listedOnly.has(k);
+  const tot = top.reduce((a, x) => a + x.w, 0); const cov = tot ? top.filter(x => have.has(x.k)).reduce((a, x) => a + x.w * (listedOnly(x.k) ? 0.5 : 1), 0) / tot : 0;
+  const sig = seniorSignals(p.cvText); const sigOk = sig.filter(x => x.ok).length; const needSig = LEVEL_KEYS.indexOf(tgt) >= 2;
+  const yScore = req ? Math.min(1, yrs / req) : 1; const sScore = sigOk / sig.length;
+  const score = Math.round((needSig ? cov * 0.45 + yScore * 0.3 + sScore * 0.25 : cov * 0.65 + yScore * 0.35) * 100);
   const fits = act.filter(j => (localMatch(j, p).score ?? 0) >= 65).length;
   return { tgt, yrs, cvY: p.cvText ? cvYearsDetail(p.cvText) : null, req: Math.round(req * 10) / 10, yrsSrc: yrsJD.length >= 2 ? "jd" : "norm", src: useJD ? "jd" : "mkt", pool: pool.length, cov: Math.round(cov * 100), score,
-    strong: top.filter(x => have.has(x.k)), gaps: top.filter(x => !have.has(x.k)).map(x => ({ ...x, quick: haveCats.has(x.cat) })), fits, act: act.length,
-    verdict: score >= 80 ? "Sẵn sàng ứng tuyển" : score >= 60 ? "Gần đạt" : "Chưa đạt" };
+    sig: needSig ? sig : null, sigOk, strong: top.filter(x => have.has(x.k)).map(x => ({ ...x, listed: listedOnly(x.k) })), gaps: top.filter(x => !have.has(x.k)).map(x => ({ ...x, quick: haveCats.has(x.cat) })), fits, act: act.length,
+    verdict: score >= 80 && (!needSig || sigOk >= 4) ? "Sẵn sàng ứng tuyển" : score >= 60 ? "Gần đạt" : "Chưa đạt" };
 }
 function marketFitCard() {
   const m = marketFit(); if (!m) return "";
   const cls = m.score >= 80 ? "good" : m.score >= 60 ? "amber" : "bad"; const short = Math.max(0, Math.ceil(m.req - m.yrs));
-  const next = short && m.cov >= 70 ? `Thiếu ${short} năm: nhấn quy mô, phạm vi và quyết định kỹ thuật trong CV để bù.` : m.gaps.length ? `Ưu tiên bù ${m.gaps.slice(0, 2).map(g => g.n).join(", ")}${m.gaps[0].quick ? " (đã có kỹ năng gần kề, học nhanh)" : ""}.` : "Giữ CV cập nhật số liệu, tập trung nộp JD phù hợp.";
-  const chip = (x, c) => `<span class="chip ${c}" title="${x.w}% ${m.src === "jd" ? "JD" : "thị trường"} yêu cầu">${esc(x.n)} <span class="mono">${x.w}%</span></span>`;
+  const missSig = m.sig ? m.sig.filter(x => !x.ok) : [];
+  const next = missSig.length >= 3 ? `Thêm bằng chứng: ${missSig.slice(0, 2).map(x => x.n.toLowerCase()).join("; ")}.` : short && m.cov >= 70 ? `Thiếu ${short} năm: nhấn quy mô, phạm vi và quyết định kỹ thuật trong CV để bù.` : m.gaps.length ? `Ưu tiên bù ${m.gaps.slice(0, 2).map(g => g.n).join(", ")}${m.gaps[0].quick ? " (đã có kỹ năng gần kề, học nhanh)" : ""}.` : "Giữ CV cập nhật số liệu, tập trung nộp JD phù hợp.";
+  const chip = (x, c) => `<span class="chip ${x.listed ? "" : c}" title="${x.w}% ${m.src === "jd" ? "JD" : "thị trường"} yêu cầu${x.listed ? " · chỉ liệt kê, chưa có trong kinh nghiệm/dự án (tính 50%)" : ""}">${esc(x.n)}${x.listed ? " *" : ""} <span class="mono">${x.w}%</span></span>`;
   return `<div class="card sec"><div class="row" style="justify-content:space-between;margin-bottom:10px"><h3 style="margin:0">CV so với thị trường · ${esc(m.tgt)} DE</h3><span class="small muted">${m.src === "jd" ? `Theo ${m.pool} JD bạn theo dõi` : "Theo nhu cầu thị trường DE (ước lượng); thêm ≥ 3 JD để tính theo JD thật"}</span></div>
     <div class="gauge"><div class="ring" style="--p:${m.score};--c:var(--${cls})"><b>${m.score}</b></div><div class="stack" style="gap:6px;min-width:0;flex:1"><b>${m.verdict} ${esc(m.tgt)}</b>
       <div class="small">Kinh nghiệm: bạn <b class="mono">${m.yrs} năm</b>${m.cvY && (m.cvY.full || m.cvY.part) ? ` <span class="muted">(CV: ${m.cvY.full} năm toàn thời gian${m.cvY.part ? ` + ${m.cvY.part} năm part-time tính 50%` : ""})</span>` : ""} · ${m.yrsSrc === "jd" ? `JD ${esc(m.tgt)} thường yêu cầu` : "cấp " + esc(m.tgt) + " thường cần"} <b class="mono">${m.req} năm</b> ${short ? `<span class="chip miss">thiếu ${short} năm</span>` : '<span class="chip have">đủ</span>'}</div>
       <div class="small">Kỹ năng: phủ <b class="mono">${m.cov}%</b> nhu cầu${m.act ? ` · hợp ≥ 65 điểm với <b class="mono">${m.fits}/${m.act}</b> JD` : ""}</div>
       <div class="small"><b>Việc nên làm:</b> ${esc(next)}</div></div></div>
     <div class="grid2" style="margin-top:12px"><div><span class="label">Điểm mạnh được săn</span><div class="chips" style="margin-top:6px">${m.strong.map(x => chip(x, "have")).join("") || '<span class="small muted">Chưa có</span>'}</div></div>
-      <div><span class="label">Còn thiếu</span><div class="chips" style="margin-top:6px">${m.gaps.map(x => chip(x, "miss")).join("") || '<span class="small muted">Không thiếu kỹ năng phổ biến</span>'}</div></div></div></div>`;
+      <div><span class="label">Còn thiếu</span><div class="chips" style="margin-top:6px">${m.gaps.map(x => chip(x, "miss")).join("") || '<span class="small muted">Không thiếu kỹ năng phổ biến</span>'}</div></div></div>
+    ${m.strong.some(x => x.listed) ? `<p class="small muted" style="margin-top:6px">* Chỉ có trong mục Kỹ năng, chưa có dự án/kinh nghiệm chứng minh: tính 50%.</p>` : ""}
+    ${m.sig ? `<div style="margin-top:12px"><span class="label">Tín hiệu cấp ${esc(m.tgt)} trong CV · ${m.sigOk}/${m.sig.length}</span><div class="chips" style="margin-top:6px">${m.sig.map(x => `<span class="chip ${x.ok ? "have" : "miss"}">${x.ok ? "✓" : "✗"} ${esc(x.n)}</span>`).join("")}</div></div>` : ""}</div>`;
 }
 function viewCV() {
   const p = state.profile;
