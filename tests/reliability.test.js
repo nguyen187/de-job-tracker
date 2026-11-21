@@ -9,7 +9,7 @@ global.window = global; global.addEventListener = () => {}; global.scrollTo = ()
 global.location = { hash: "" }; global.localStorage = { getItem: () => null, setItem() {} };
 global.console.error = () => {};
 eval(js.replace(/\/\* =+ Boot =+ \*\/[\s\S]*$/, "") + `
-global.__t = { detectYearsJD, marketFit, marketFitCard, thaw, bulkSetStatus, draftStoryFromAnswer, csvPreview, csvIsDup, bringLine, bulletSources, cvCmpBase, funnelStats, firstReplyDays, tagResponse, patternCard, snapRecords, restoreRecord, snapPanel, parseCSV, csvToJobs, importJobsCSV, csvDate, viewForKey, openShortcuts, SHORTCUTS, NAV_NAMES, lineDiff, cvDiff, cvDiffCard, normDoc, pipelineReport, isIdle, staleDays, qThemes, storiesForQuestion, storyHint, removeWithUndo, toastActionGet: () => toastAction, LEARN, learnKey, learnLink, loadSample, rawRecords, rawCard, msgTemplate, searchAll, storyMatches, prepBrief, setupSteps, setupCard, jobRounds, weekReport, reportText, backupReminder, compareRows, QB, pickQuestion, logPractice, qStats, weekStats, wkKey, mdLite, removeJob, undoDelete, purgeTrash, TRASH, findDuplicate, jdSimilarity, filteredJobs, jobsCSV, whenLabel, deadlineInfo, interviewInfo, stageDays, upcomingEvents, icsFor, jobEvents, buildTodos, vBrief, briefAI, BREVITY, relAdded, addedAt, sortJobs, state, vAnalysis, vReview, vGrade, vPlan, vDebrief, normalizeState, render, localMatch, applyRemote, SYNC, pending, VIEWS, loadSample, isStale, hsh };`);
+global.__t = { cvYearsDetail, detectYearsJD, marketFit, marketFitCard, thaw, bulkSetStatus, draftStoryFromAnswer, csvPreview, csvIsDup, bringLine, bulletSources, cvCmpBase, funnelStats, firstReplyDays, tagResponse, patternCard, snapRecords, restoreRecord, snapPanel, parseCSV, csvToJobs, importJobsCSV, csvDate, viewForKey, openShortcuts, SHORTCUTS, NAV_NAMES, lineDiff, cvDiff, cvDiffCard, normDoc, pipelineReport, isIdle, staleDays, qThemes, storiesForQuestion, storyHint, removeWithUndo, toastActionGet: () => toastAction, LEARN, learnKey, learnLink, loadSample, rawRecords, rawCard, msgTemplate, searchAll, storyMatches, prepBrief, setupSteps, setupCard, jobRounds, weekReport, reportText, backupReminder, compareRows, QB, pickQuestion, logPractice, qStats, weekStats, wkKey, mdLite, removeJob, undoDelete, purgeTrash, TRASH, findDuplicate, jdSimilarity, filteredJobs, jobsCSV, whenLabel, deadlineInfo, interviewInfo, stageDays, upcomingEvents, icsFor, jobEvents, buildTodos, vBrief, briefAI, BREVITY, relAdded, addedAt, sortJobs, state, vAnalysis, vReview, vGrade, vPlan, vDebrief, normalizeState, render, localMatch, applyRemote, SYNC, pending, VIEWS, loadSample, isStale, hsh };`);
 const T = global.__t;
 let pass = 0, fail = 0; const fails = [];
 const check = (n, ok, d) => { if (ok) pass++; else { fail++; fails.push(n + (d ? " → " + d : "")); } };
@@ -478,5 +478,15 @@ T.state.profile = { cvText: "x", role: "Senior Data Engineer", years: 4, skills:
 T.state.jobs = [1, 1, 2].map((y, i) => ({ id: "jl" + i, title: "Junior Data Engineer", status: "saved", jd: "Junior Data Engineer. " + y + "+ years of experience with SQL and Python pipelines in data engineering teams.", history: [] }));
 const mf2 = T.marketFit(); check("junior JDs don't set the senior years bar", mf2.yrsSrc === "norm" && mf2.req === 4, JSON.stringify({ req: mf2.req, src: mf2.yrsSrc }));
 T.state.jobs = []; T.state.profile = null;
+
+// 45. CV years: month names, part-time at 50%
+const NOWY = new Date().getFullYear();
+const cvA = `Experience\nSenior Data Engineer from Jun ${NOWY - 1} to Now\nData Engineer from Mar ${NOWY - 3} to Jun ${NOWY - 1}\nRemote Parttime Job from July ${NOWY - 5} to Mar ${NOWY - 3}\nEducation\nBachelor of Data Science Oct. ${NOWY - 6} – Aug. ${NOWY - 2}`;
+const yd = T.cvYearsDetail(cvA);
+check("month-name ranges parsed (full-time ≈ 2.x–4 yrs)", yd.full >= 2 && yd.full < 4, JSON.stringify(yd));
+check("part-time counted separately", yd.part > 1.5 && yd.part < 2, JSON.stringify(yd));
+check("total = full + 50% part, floored", yd.years === Math.floor(yd.full + yd.part * 0.5 + 0.05), JSON.stringify(yd));
+check("education dates excluded", T.cvYearsDetail("Education\nBSc Oct. 2016 – Aug. 2020").years === 0);
+check("numeric months still work", T.cvYearsDetail(`Experience\nDE 01/${NOWY - 3} - 12/${NOWY - 1}`).full >= 2.9);
 
 console.log(`\n${pass} passed, ${fail} failed`); fails.forEach(f => console.log("  ✕ " + f)); process.exitCode = fail ? 1 : 0;
