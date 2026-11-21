@@ -9,7 +9,7 @@ global.window = global; global.addEventListener = () => {}; global.scrollTo = ()
 global.location = { hash: "" }; global.localStorage = { getItem: () => null, setItem() {} };
 global.console.error = () => {};
 eval(js.replace(/\/\* =+ Boot =+ \*\/[\s\S]*$/, "") + `
-global.__t = { marketFit, marketFitCard, thaw, bulkSetStatus, draftStoryFromAnswer, csvPreview, csvIsDup, bringLine, bulletSources, cvCmpBase, funnelStats, firstReplyDays, tagResponse, patternCard, snapRecords, restoreRecord, snapPanel, parseCSV, csvToJobs, importJobsCSV, csvDate, viewForKey, openShortcuts, SHORTCUTS, NAV_NAMES, lineDiff, cvDiff, cvDiffCard, normDoc, pipelineReport, isIdle, staleDays, qThemes, storiesForQuestion, storyHint, removeWithUndo, toastActionGet: () => toastAction, LEARN, learnKey, learnLink, loadSample, rawRecords, rawCard, msgTemplate, searchAll, storyMatches, prepBrief, setupSteps, setupCard, jobRounds, weekReport, reportText, backupReminder, compareRows, QB, pickQuestion, logPractice, qStats, weekStats, wkKey, mdLite, removeJob, undoDelete, purgeTrash, TRASH, findDuplicate, jdSimilarity, filteredJobs, jobsCSV, whenLabel, deadlineInfo, interviewInfo, stageDays, upcomingEvents, icsFor, jobEvents, buildTodos, vBrief, briefAI, BREVITY, relAdded, addedAt, sortJobs, state, vAnalysis, vReview, vGrade, vPlan, vDebrief, normalizeState, render, localMatch, applyRemote, SYNC, pending, VIEWS, loadSample, isStale, hsh };`);
+global.__t = { detectYearsJD, marketFit, marketFitCard, thaw, bulkSetStatus, draftStoryFromAnswer, csvPreview, csvIsDup, bringLine, bulletSources, cvCmpBase, funnelStats, firstReplyDays, tagResponse, patternCard, snapRecords, restoreRecord, snapPanel, parseCSV, csvToJobs, importJobsCSV, csvDate, viewForKey, openShortcuts, SHORTCUTS, NAV_NAMES, lineDiff, cvDiff, cvDiffCard, normDoc, pipelineReport, isIdle, staleDays, qThemes, storiesForQuestion, storyHint, removeWithUndo, toastActionGet: () => toastAction, LEARN, learnKey, learnLink, loadSample, rawRecords, rawCard, msgTemplate, searchAll, storyMatches, prepBrief, setupSteps, setupCard, jobRounds, weekReport, reportText, backupReminder, compareRows, QB, pickQuestion, logPractice, qStats, weekStats, wkKey, mdLite, removeJob, undoDelete, purgeTrash, TRASH, findDuplicate, jdSimilarity, filteredJobs, jobsCSV, whenLabel, deadlineInfo, interviewInfo, stageDays, upcomingEvents, icsFor, jobEvents, buildTodos, vBrief, briefAI, BREVITY, relAdded, addedAt, sortJobs, state, vAnalysis, vReview, vGrade, vPlan, vDebrief, normalizeState, render, localMatch, applyRemote, SYNC, pending, VIEWS, loadSample, isStale, hsh };`);
 const T = global.__t;
 let pass = 0, fail = 0; const fails = [];
 const check = (n, ok, d) => { if (ok) pass++; else { fail++; fails.push(n + (d ? " → " + d : "")); } };
@@ -470,6 +470,13 @@ T.state.jobs = [5, 6, 5].map((y, i) => ({ id: "mk" + i, title: "Senior Data Engi
 const mf1 = T.marketFit();
 check("market uses JD years median + JD demand", mf1.yrsSrc === "jd" && mf1.req === 5 && mf1.src === "jd" && mf1.gaps.some(x => x.k === "kafka"), JSON.stringify({ req: mf1.req, src: mf1.src }));
 check("market card renders verdict + years gap", /CV so với thị trường/.test(T.marketFitCard()) && /thiếu 2 năm/.test(T.marketFitCard()));
+T.state.jobs = []; T.state.profile = null;
+
+// 44. JD years = overall requirement, level-matched only
+check("JD years takes overall, not skill-specific", T.detectYearsJD("Requirements: 1+ year with Kafka. 5+ years of experience in data engineering.") === 5);
+T.state.profile = { cvText: "x", role: "Senior Data Engineer", years: 4, skills: ["sql"] };
+T.state.jobs = [1, 1, 2].map((y, i) => ({ id: "jl" + i, title: "Junior Data Engineer", status: "saved", jd: "Junior Data Engineer. " + y + "+ years of experience with SQL and Python pipelines in data engineering teams.", history: [] }));
+const mf2 = T.marketFit(); check("junior JDs don't set the senior years bar", mf2.yrsSrc === "norm" && mf2.req === 4, JSON.stringify({ req: mf2.req, src: mf2.yrsSrc }));
 T.state.jobs = []; T.state.profile = null;
 
 console.log(`\n${pass} passed, ${fail} failed`); fails.forEach(f => console.log("  ✕ " + f)); process.exitCode = fail ? 1 : 0;

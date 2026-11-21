@@ -439,11 +439,11 @@ function detectYearsCV(text) {
 }
 /* JD years: a number of years only counts when followed by experience wording, and not "ago"/"founded". */
 function detectYearsJD(text) {
-  const t = text || ""; const re = /(\d{1,2})\s*\+?\s*(?:[-–~]\s*\d{1,2}\s*)?\+?\s*(?:năm|years?|yrs)\b([^.\n;]{0,60})/gi; let r;
+  const t = text || ""; const re = /(\d{1,2})\s*\+?\s*(?:[-–~]\s*\d{1,2}\s*)?\+?\s*(?:năm|years?|yrs)\b([^.\n;]{0,60})/gi; let r, best = null;
   while ((r = re.exec(t))) { const tail = r[2], before = t.slice(Math.max(0, r.index - 40), r.index).split(/[.\n;:]/).pop();
     if (/ago|trước đây|founded|thành lập|established|history|lịch sử/i.test(tail + " " + before)) continue;
-    if (/experience|kinh nghiệm|\bexp\b|working|làm việc|hands-on|in (?:data|software|a similar|the field)|với|with|of (?:professional|relevant)|as a/i.test(tail) || /at least|minimum|tối thiểu|ít nhất|trên|over|more than/i.test(before.slice(-20))) return +r[1]; }
-  return null;
+    if ((/experience|kinh nghiệm|\bexp\b|working|làm việc|hands-on|in (?:data|software|a similar|the field)|với|with|of (?:professional|relevant)|as a/i.test(tail) || /at least|minimum|tối thiểu|ít nhất|trên|over|more than/i.test(before.slice(-20))) && +r[1] <= 15) best = Math.max(best ?? 0, +r[1]); }
+  return best;
 }
 function detectLevel(text) {
   const t = (text || "").toLowerCase();
@@ -981,7 +981,7 @@ function marketFit() {
   const lvRole = detectLevel(p.role || ""); const tgt = (lvRole === "Staff+" ? "Staff" : lvRole) || careerLevels().tgt;
   const act = state.jobs.filter(j => ACTIVE(j) && (j.jd || "").length > 80);
   const atLv = act.filter(j => { const l = detectLevel((j.title || "") + " " + (j.jd || "").slice(0, 1500)); return (l === "Staff+" ? "Staff" : l) === tgt; });
-  const yrsJD = (atLv.length >= 2 ? atLv : act).map(j => detectYearsJD(j.jd)).filter(v => v != null && v <= 15);
+  const yrsJD = atLv.map(j => detectYearsJD(j.jd)).filter(v => v != null);
   const req = yrsJD.length >= 2 ? median(yrsJD) : LEVEL_YEARS[tgt] ?? 3; const yrs = +p.years || 0;
   const pool = atLv.length >= 3 ? atLv : act; const useJD = pool.length >= 3; const freq = {};
   pool.forEach(j => new Set(jdSkills(j)).forEach(k => freq[k] = (freq[k] || 0) + 1));
@@ -1001,7 +1001,7 @@ function marketFitCard() {
   const chip = (x, c) => `<span class="chip ${c}" title="${x.w}% ${m.src === "jd" ? "JD" : "thị trường"} yêu cầu">${esc(x.n)} <span class="mono">${x.w}%</span></span>`;
   return `<div class="card sec"><div class="row" style="justify-content:space-between;margin-bottom:10px"><h3 style="margin:0">CV so với thị trường · ${esc(m.tgt)} DE</h3><span class="small muted">${m.src === "jd" ? `Theo ${m.pool} JD bạn theo dõi` : "Theo nhu cầu thị trường DE (ước lượng); thêm ≥ 3 JD để tính theo JD thật"}</span></div>
     <div class="gauge"><div class="ring" style="--p:${m.score};--c:var(--${cls})"><b>${m.score}</b></div><div class="stack" style="gap:6px;min-width:0;flex:1"><b>${m.verdict} ${esc(m.tgt)}</b>
-      <div class="small">Kinh nghiệm: bạn <b class="mono">${m.yrs} năm</b> · ${m.yrsSrc === "jd" ? "JD thường yêu cầu" : "cấp " + esc(m.tgt) + " thường cần"} <b class="mono">${m.req} năm</b> ${short ? `<span class="chip miss">thiếu ${short} năm</span>` : '<span class="chip have">đủ</span>'}</div>
+      <div class="small">Kinh nghiệm: bạn <b class="mono">${m.yrs} năm</b> · ${m.yrsSrc === "jd" ? `JD ${esc(m.tgt)} thường yêu cầu` : "cấp " + esc(m.tgt) + " thường cần"} <b class="mono">${m.req} năm</b> ${short ? `<span class="chip miss">thiếu ${short} năm</span>` : '<span class="chip have">đủ</span>'}</div>
       <div class="small">Kỹ năng: phủ <b class="mono">${m.cov}%</b> nhu cầu${m.act ? ` · hợp ≥ 65 điểm với <b class="mono">${m.fits}/${m.act}</b> JD` : ""}</div>
       <div class="small"><b>Việc nên làm:</b> ${esc(next)}</div></div></div>
     <div class="grid2" style="margin-top:12px"><div><span class="label">Điểm mạnh được săn</span><div class="chips" style="margin-top:6px">${m.strong.map(x => chip(x, "have")).join("") || '<span class="small muted">Chưa có</span>'}</div></div>
