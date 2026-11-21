@@ -974,6 +974,39 @@ function buildTodos() {
 }
 
 /* ================= View: CV ================= */
+/* CV vs market for the target level: years vs what JDs ask, demand-weighted skill coverage, share of tracked JDs that fit. No AI. */
+const LEVEL_YEARS = { Junior: 0, Mid: 2, Senior: 4, Lead: 6, Staff: 8 };
+function marketFit() {
+  const p = state.profile; if (!p) return null;
+  const lvRole = detectLevel(p.role || ""); const tgt = (lvRole === "Staff+" ? "Staff" : lvRole) || careerLevels().tgt;
+  const act = state.jobs.filter(j => ACTIVE(j) && (j.jd || "").length > 80);
+  const atLv = act.filter(j => { const l = detectLevel((j.title || "") + " " + (j.jd || "").slice(0, 1500)); return (l === "Staff+" ? "Staff" : l) === tgt; });
+  const yrsJD = (atLv.length >= 2 ? atLv : act).map(j => detectYearsJD(j.jd)).filter(v => v != null && v <= 15);
+  const req = yrsJD.length >= 2 ? median(yrsJD) : LEVEL_YEARS[tgt] ?? 3; const yrs = +p.years || 0;
+  const pool = atLv.length >= 3 ? atLv : act; const useJD = pool.length >= 3; const freq = {};
+  pool.forEach(j => new Set(jdSkills(j)).forEach(k => freq[k] = (freq[k] || 0) + 1));
+  const top = SK.map(sk => ({ k: sk.k, n: sk.n, cat: sk.cat, w: useJD ? Math.round((freq[sk.k] || 0) / pool.length * 100) : (MKT[sk.k] || 0) })).filter(x => x.w >= 10).sort((a, b) => b.w - a.w).slice(0, 12);
+  const have = new Set(p.skills || []); const haveCats = new Set([...have].map(k => SKM[k]?.cat).filter(Boolean));
+  const tot = top.reduce((a, x) => a + x.w, 0); const cov = tot ? top.filter(x => have.has(x.k)).reduce((a, x) => a + x.w, 0) / tot : 0;
+  const yScore = req ? Math.min(1, yrs / req) : 1; const score = Math.round((cov * 0.65 + yScore * 0.35) * 100);
+  const fits = act.filter(j => (localMatch(j, p).score ?? 0) >= 65).length;
+  return { tgt, yrs, req: Math.round(req * 10) / 10, yrsSrc: yrsJD.length >= 2 ? "jd" : "norm", src: useJD ? "jd" : "mkt", pool: pool.length, cov: Math.round(cov * 100), score,
+    strong: top.filter(x => have.has(x.k)), gaps: top.filter(x => !have.has(x.k)).map(x => ({ ...x, quick: haveCats.has(x.cat) })), fits, act: act.length,
+    verdict: score >= 80 ? "Sẵn sàng ứng tuyển" : score >= 60 ? "Gần đạt" : "Chưa đạt" };
+}
+function marketFitCard() {
+  const m = marketFit(); if (!m) return "";
+  const cls = m.score >= 80 ? "good" : m.score >= 60 ? "amber" : "bad"; const short = Math.max(0, Math.ceil(m.req - m.yrs));
+  const next = short && m.cov >= 70 ? `Thiếu ${short} năm: nhấn quy mô, phạm vi và quyết định kỹ thuật trong CV để bù.` : m.gaps.length ? `Ưu tiên bù ${m.gaps.slice(0, 2).map(g => g.n).join(", ")}${m.gaps[0].quick ? " (đã có kỹ năng gần kề, học nhanh)" : ""}.` : "Giữ CV cập nhật số liệu, tập trung nộp JD phù hợp.";
+  const chip = (x, c) => `<span class="chip ${c}" title="${x.w}% ${m.src === "jd" ? "JD" : "thị trường"} yêu cầu">${esc(x.n)} <span class="mono">${x.w}%</span></span>`;
+  return `<div class="card sec"><div class="row" style="justify-content:space-between;margin-bottom:10px"><h3 style="margin:0">CV so với thị trường · ${esc(m.tgt)} DE</h3><span class="small muted">${m.src === "jd" ? `Theo ${m.pool} JD bạn theo dõi` : "Theo nhu cầu thị trường DE (ước lượng); thêm ≥ 3 JD để tính theo JD thật"}</span></div>
+    <div class="gauge"><div class="ring" style="--p:${m.score};--c:var(--${cls})"><b>${m.score}</b></div><div class="stack" style="gap:6px;min-width:0;flex:1"><b>${m.verdict} ${esc(m.tgt)}</b>
+      <div class="small">Kinh nghiệm: <b class="mono">${m.yrs}</b> / ${m.req} năm ${m.yrsSrc === "jd" ? "JD yêu cầu (trung vị)" : "chuẩn cấp " + esc(m.tgt)} ${short ? `<span class="chip miss">thiếu ${short}</span>` : '<span class="chip have">đủ</span>'}</div>
+      <div class="small">Kỹ năng: phủ <b class="mono">${m.cov}%</b> nhu cầu${m.act ? ` · hợp ≥ 65 điểm với <b class="mono">${m.fits}/${m.act}</b> JD` : ""}</div>
+      <div class="small"><b>Việc nên làm:</b> ${esc(next)}</div></div></div>
+    <div class="grid2" style="margin-top:12px"><div><span class="label">Điểm mạnh được săn</span><div class="chips" style="margin-top:6px">${m.strong.map(x => chip(x, "have")).join("") || '<span class="small muted">Chưa có</span>'}</div></div>
+      <div><span class="label">Còn thiếu</span><div class="chips" style="margin-top:6px">${m.gaps.map(x => chip(x, "miss")).join("") || '<span class="small muted">Không thiếu kỹ năng phổ biến</span>'}</div></div></div></div>`;
+}
 function viewCV() {
   const p = state.profile;
   const upload = `<label class="drop-zone" id="cvDrop" for="cvFile"><input type="file" id="cvFile" accept=".pdf,.docx,.txt,.md,application/pdf"><b>Kéo thả CV vào đây hoặc bấm để chọn</b><div class="small muted">PDF, DOCX, TXT · nội dung được đọc ngay trên trình duyệt</div></label>`;
@@ -992,7 +1025,7 @@ function viewCV() {
       <label class="field"><span>Mức lương mong muốn</span><input type="text" id="pf-salary" data-pf="salary" value="${esc(p.salary || "")}" placeholder="vd: 2.500–3.200 USD gross"></label>
       <label class="field"><span>Địa điểm / hình thức</span><input type="text" id="pf-loc" data-pf="location" value="${esc(p.location || "")}" placeholder="HCM · Hybrid / Remote"></label>
     </div></div>
-    <div class="sec"><div class="row" style="justify-content:space-between;margin-bottom:12px"><h2>Kỹ năng nhận diện từ CV <span class="muted mono small">${(p.skills || []).length}</span></h2>
+    ${marketFitCard()}<div class="sec"><div class="row" style="justify-content:space-between;margin-bottom:12px"><h2>Kỹ năng nhận diện từ CV <span class="muted mono small">${(p.skills || []).length}</span></h2>
       <div class="row"><input type="text" id="skillAdd" placeholder="Thêm kỹ năng, vd: Airbyte" style="width:220px"><button class="btn sm" data-act="skill-add">Thêm</button><button class="btn sm ghost" data-act="skill-redetect">Nhận diện lại</button></div></div>
       <div class="grid3">${byCat.map(([c, ks]) => `<div class="card"><div class="label" style="margin-bottom:8px">${esc(c)}</div><div class="chips">${ks.map(k => `<span class="chip have">${esc(skillName(k))}<button data-act="skill-del" data-k="${esc(k)}" aria-label="Xóa">×</button></span>`).join("")}</div></div>`).join("")}
       ${custom.length ? `<div class="card"><div class="label" style="margin-bottom:8px">Bổ sung thủ công</div><div class="chips">${custom.map(k => `<span class="chip acc">${esc(skillName(k))}<button data-act="skill-del" data-k="${esc(k)}" aria-label="Xóa">×</button></span>`).join("")}</div></div>` : ""}</div></div>

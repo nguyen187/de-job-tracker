@@ -9,7 +9,7 @@ global.window = global; global.addEventListener = () => {}; global.scrollTo = ()
 global.location = { hash: "" }; global.localStorage = { getItem: () => null, setItem() {} };
 global.console.error = () => {};
 eval(js.replace(/\/\* =+ Boot =+ \*\/[\s\S]*$/, "") + `
-global.__t = { thaw, bulkSetStatus, draftStoryFromAnswer, csvPreview, csvIsDup, bringLine, bulletSources, cvCmpBase, funnelStats, firstReplyDays, tagResponse, patternCard, snapRecords, restoreRecord, snapPanel, parseCSV, csvToJobs, importJobsCSV, csvDate, viewForKey, openShortcuts, SHORTCUTS, NAV_NAMES, lineDiff, cvDiff, cvDiffCard, normDoc, pipelineReport, isIdle, staleDays, qThemes, storiesForQuestion, storyHint, removeWithUndo, toastActionGet: () => toastAction, LEARN, learnKey, learnLink, loadSample, rawRecords, rawCard, msgTemplate, searchAll, storyMatches, prepBrief, setupSteps, setupCard, jobRounds, weekReport, reportText, backupReminder, compareRows, QB, pickQuestion, logPractice, qStats, weekStats, wkKey, mdLite, removeJob, undoDelete, purgeTrash, TRASH, findDuplicate, jdSimilarity, filteredJobs, jobsCSV, whenLabel, deadlineInfo, interviewInfo, stageDays, upcomingEvents, icsFor, jobEvents, buildTodos, vBrief, briefAI, BREVITY, relAdded, addedAt, sortJobs, state, vAnalysis, vReview, vGrade, vPlan, vDebrief, normalizeState, render, localMatch, applyRemote, SYNC, pending, VIEWS, loadSample, isStale, hsh };`);
+global.__t = { marketFit, marketFitCard, thaw, bulkSetStatus, draftStoryFromAnswer, csvPreview, csvIsDup, bringLine, bulletSources, cvCmpBase, funnelStats, firstReplyDays, tagResponse, patternCard, snapRecords, restoreRecord, snapPanel, parseCSV, csvToJobs, importJobsCSV, csvDate, viewForKey, openShortcuts, SHORTCUTS, NAV_NAMES, lineDiff, cvDiff, cvDiffCard, normDoc, pipelineReport, isIdle, staleDays, qThemes, storiesForQuestion, storyHint, removeWithUndo, toastActionGet: () => toastAction, LEARN, learnKey, learnLink, loadSample, rawRecords, rawCard, msgTemplate, searchAll, storyMatches, prepBrief, setupSteps, setupCard, jobRounds, weekReport, reportText, backupReminder, compareRows, QB, pickQuestion, logPractice, qStats, weekStats, wkKey, mdLite, removeJob, undoDelete, purgeTrash, TRASH, findDuplicate, jdSimilarity, filteredJobs, jobsCSV, whenLabel, deadlineInfo, interviewInfo, stageDays, upcomingEvents, icsFor, jobEvents, buildTodos, vBrief, briefAI, BREVITY, relAdded, addedAt, sortJobs, state, vAnalysis, vReview, vGrade, vPlan, vDebrief, normalizeState, render, localMatch, applyRemote, SYNC, pending, VIEWS, loadSample, isStale, hsh };`);
 const T = global.__t;
 let pass = 0, fail = 0; const fails = [];
 const check = (n, ok, d) => { if (ok) pass++; else { fail++; fails.push(n + (d ? " → " + d : "")); } };
@@ -456,6 +456,20 @@ check("frozen remote profile is writable after apply", !throws(() => { "use stri
 const fj = Object.freeze({ kind: "job", id: "fzj", status: "saved", updatedAt: Date.now() + 1e6, history: Object.freeze([]) });
 T.applyRemote("fzj", fj, false); const jj = T.state.jobs.find(j => j.id === "fzj");
 check("frozen remote job + nested arrays writable", !!jj && !throws(() => { "use strict"; jj.history.push({ status: "applied" }); jj.status = "applied"; }));
+T.state.jobs = []; T.state.profile = null;
+
+// 43. CV vs market
+T.state.jobs = []; T.state.profile = null;
+check("market fit null without CV", T.marketFit() === null && T.marketFitCard() === "");
+T.state.profile = { cvText: "Data engineer SQL Python Airflow Spark AWS", role: "Senior Data Engineer", years: 3, skills: ["sql", "python", "airflow", "spark", "aws"] };
+const mf0 = T.marketFit();
+check("market fallback: target from role, norm years", mf0.tgt === "Senior" && mf0.req === 4 && mf0.src === "mkt" && mf0.yrsSrc === "norm");
+check("market coverage counts owned high-demand skills", mf0.cov > 30 && mf0.cov < 100 && mf0.strong.some(x => x.k === "sql") && mf0.gaps.length > 0);
+const jdT = y => `Senior Data Engineer. Requirements: ${y}+ years of experience in data engineering. Strong SQL, Python, Kafka, Spark, dbt and Snowflake. Build streaming pipelines.`;
+T.state.jobs = [5, 6, 5].map((y, i) => ({ id: "mk" + i, title: "Senior Data Engineer", status: "saved", jd: jdT(y), history: [] }));
+const mf1 = T.marketFit();
+check("market uses JD years median + JD demand", mf1.yrsSrc === "jd" && mf1.req === 5 && mf1.src === "jd" && mf1.gaps.some(x => x.k === "kafka"), JSON.stringify({ req: mf1.req, src: mf1.src }));
+check("market card renders verdict + years gap", /CV so với thị trường/.test(T.marketFitCard()) && /thiếu 2/.test(T.marketFitCard()));
 T.state.jobs = []; T.state.profile = null;
 
 console.log(`\n${pass} passed, ${fail} failed`); fails.forEach(f => console.log("  ✕ " + f)); process.exitCode = fail ? 1 : 0;
