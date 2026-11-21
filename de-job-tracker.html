@@ -1001,7 +1001,7 @@ function marketFitCard() {
   const chip = (x, c) => `<span class="chip ${c}" title="${x.w}% ${m.src === "jd" ? "JD" : "thị trường"} yêu cầu">${esc(x.n)} <span class="mono">${x.w}%</span></span>`;
   return `<div class="card sec"><div class="row" style="justify-content:space-between;margin-bottom:10px"><h3 style="margin:0">CV so với thị trường · ${esc(m.tgt)} DE</h3><span class="small muted">${m.src === "jd" ? `Theo ${m.pool} JD bạn theo dõi` : "Theo nhu cầu thị trường DE (ước lượng); thêm ≥ 3 JD để tính theo JD thật"}</span></div>
     <div class="gauge"><div class="ring" style="--p:${m.score};--c:var(--${cls})"><b>${m.score}</b></div><div class="stack" style="gap:6px;min-width:0;flex:1"><b>${m.verdict} ${esc(m.tgt)}</b>
-      <div class="small">Kinh nghiệm: <b class="mono">${m.yrs}</b> / ${m.req} năm ${m.yrsSrc === "jd" ? "JD yêu cầu (trung vị)" : "chuẩn cấp " + esc(m.tgt)} ${short ? `<span class="chip miss">thiếu ${short}</span>` : '<span class="chip have">đủ</span>'}</div>
+      <div class="small">Kinh nghiệm: bạn <b class="mono">${m.yrs} năm</b> · ${m.yrsSrc === "jd" ? "JD thường yêu cầu" : "cấp " + esc(m.tgt) + " thường cần"} <b class="mono">${m.req} năm</b> ${short ? `<span class="chip miss">thiếu ${short} năm</span>` : '<span class="chip have">đủ</span>'}</div>
       <div class="small">Kỹ năng: phủ <b class="mono">${m.cov}%</b> nhu cầu${m.act ? ` · hợp ≥ 65 điểm với <b class="mono">${m.fits}/${m.act}</b> JD` : ""}</div>
       <div class="small"><b>Việc nên làm:</b> ${esc(next)}</div></div></div>
     <div class="grid2" style="margin-top:12px"><div><span class="label">Điểm mạnh được săn</span><div class="chips" style="margin-top:6px">${m.strong.map(x => chip(x, "have")).join("") || '<span class="small muted">Chưa có</span>'}</div></div>

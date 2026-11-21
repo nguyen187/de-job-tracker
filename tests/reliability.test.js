@@ -469,7 +469,7 @@ const jdT = y => `Senior Data Engineer. Requirements: ${y}+ years of experience 
 T.state.jobs = [5, 6, 5].map((y, i) => ({ id: "mk" + i, title: "Senior Data Engineer", status: "saved", jd: jdT(y), history: [] }));
 const mf1 = T.marketFit();
 check("market uses JD years median + JD demand", mf1.yrsSrc === "jd" && mf1.req === 5 && mf1.src === "jd" && mf1.gaps.some(x => x.k === "kafka"), JSON.stringify({ req: mf1.req, src: mf1.src }));
-check("market card renders verdict + years gap", /CV so với thị trường/.test(T.marketFitCard()) && /thiếu 2/.test(T.marketFitCard()));
+check("market card renders verdict + years gap", /CV so với thị trường/.test(T.marketFitCard()) && /thiếu 2 năm/.test(T.marketFitCard()));
 T.state.jobs = []; T.state.profile = null;
 
 console.log(`\n${pass} passed, ${fail} failed`); fails.forEach(f => console.log("  ✕ " + f)); process.exitCode = fail ? 1 : 0;
